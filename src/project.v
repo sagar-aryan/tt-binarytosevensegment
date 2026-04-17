@@ -97,7 +97,7 @@ module anode_decoder(output [7:0]anode, input [2:0]select_line);
 endmodule
 
 module multiplexer(output [3:0]bcd, input [31:0]bcd_sequence, input [2:0]select_line);
-  assign bcd = bcd_sequence[select_line*4 +: 4];
+  assign bcd = bcd_sequence[bcd_sequence[(select_line << 2) +: 4];
 endmodule
 
 module refresh_counter(output reg [2:0]select_line, input clk, reset);
