@@ -15,7 +15,7 @@ module tt_um_binary_bcd (
     input  wire       clk,      // clock
     input  wire       rst_n     // reset_n - low to reset
 );
-
+   
     wire [15:0]binary_concat;
     wire rst_inv;
   // All output pins must be assigned. If not used, assign to 0.
