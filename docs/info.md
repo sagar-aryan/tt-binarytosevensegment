@@ -1,4 +1,4 @@
-## How it works
+## How it works 
 
 The `uart_eight_driver` module implements a complete pipeline that receives serial data via UART, converts it into a numeric value, and displays it on an 8-digit seven-segment display.
 
