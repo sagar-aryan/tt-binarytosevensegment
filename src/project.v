@@ -33,7 +33,7 @@ module tt_um_uart_8digit (
                                   .rx(ui_in[0]),
                                   .clk(clk),
                                   .reset(rst)
-                                 );
+                                  );
   
   assign uio_oe=8'b11111111;
   // List all unused inputs to prevent warnings
