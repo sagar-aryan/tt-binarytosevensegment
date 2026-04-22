@@ -1,23 +1,31 @@
 # Tiny Tapeout project information
 project:
-  title:        "I2C 7-Segment Display Driver"
-  author:       "Aryan Sagar"
-  discord:      "nampak248956"  
-  description:  "I2C slave that receives 32-bit data and displays it on a multiplexed 7-segment display"
-  language:     "Verilog"
-  clock_hz:     10000000   # adjust if your clock is different
+  title:        "UART 8-Digit Display Driver"      # Project title
+  author:       "Aryan Sagar"      # Your name
+  discord:      "nampak248956"      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
+  description:  "Receives 32-bit data over UART and displays it on an 8-digit seven-segment display"      # One line description of what your project does
+  language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
+  clock_hz:     100000000       # Clock frequency in Hz (or 0 if not applicable)
 
-  tiles: "1x1"
+  # How many tiles your design occupies? A single tile is about 167x108 uM.
+  tiles: "1x1"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
 
-  top_module:  "tt_um_i2c_display"
+  # Your top module name must start with "tt_um_". Make it unique by including your github username:
+  top_module:  "tt_um_uart_8digit"
 
+  # List your project's source files here.
+  # Source files must be in ./src and you must list each source file separately, one per line.
+  # Don't forget to also update `PROJECT_SOURCES` in test/Makefile.
   source_files:
-    - "project.v"
+    - project.v
+    - uart_rx.v
+    - uart_tx.v
 
-# Pinout description
+# The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
+# This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
   # Inputs
-  ui[0]: "SCL (I2C clock input)"
+  ui[0]: "UART RX"
   ui[1]: ""
   ui[2]: ""
   ui[3]: ""
@@ -26,25 +34,25 @@ pinout:
   ui[6]: ""
   ui[7]: ""
 
-  # Outputs (segments)
-  uo[0]: "ANODE_0 (digit select via transistor)"
-  uo[1]: "SEG_A"
-  uo[2]: "SEG_B"
-  uo[3]: "SEG_C"
-  uo[4]: "SEG_D"
-  uo[5]: "SEG_E"
-  uo[6]: "SEG_F"
-  uo[7]: "SEG_G"
+  # Outputs
+  uo[0]: "UART TX"
+  uo[1]: "seg a"
+  uo[2]: "seg b"
+  uo[3]: "seg c"
+  uo[4]: "seg d"
+  uo[5]: "seg e"
+  uo[6]: "seg f"
+  uo[7]: "seg g"
 
   # Bidirectional pins
-  uio[0]: "SDA (I2C data)"
-  uio[1]: "ANODE_1"
-  uio[2]: "ANODE_2"
-  uio[3]: "ANODE_3"
-  uio[4]: "ANODE_4"
-  uio[5]: "ANODE_5"
-  uio[6]: "ANODE_6"
-  uio[7]: "ANODE_7"
+  uio[0]: "anode 0"
+  uio[1]: "anode 1"
+  uio[2]: "anode 2"
+  uio[3]: "anode 3"
+  uio[4]: "anode 4"
+  uio[5]: "andoe 5"
+  uio[6]: "anode 6"
+  uio[7]: "anode 7"
 
 # Do not change!
 yaml_version: 6
