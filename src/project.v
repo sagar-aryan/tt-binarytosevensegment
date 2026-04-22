@@ -180,7 +180,7 @@ reg [FILTER_LEN-1:0] sda_i_filter = {FILTER_LEN{1'b1}};
 reg scl_i_reg = 1'b1;
 reg sda_i_reg = 1'b1;
 
-reg scl_o_reg = 1'b1, scl_o_next;
+reg scl_o_reg = 1'b1, ;
 reg sda_o_reg = 1'b1, sda_o_next;
 
 reg last_scl_i_reg = 1'b1;
@@ -234,7 +234,7 @@ always @* begin
     m_axis_data_tvalid_next = m_axis_data_tvalid_reg && !m_axis_data_tready;
     m_axis_data_tlast_next = m_axis_data_tlast_reg;
 
-    scl_o_next = scl_o_reg;
+    scl_o_next = 1'b0;
     sda_o_next = sda_o_reg;
 
     bus_addressed_next = bus_addressed_reg;
