@@ -1,49 +1,50 @@
-yaml_version: 6
-
+# Tiny Tapeout project information
 project:
-  title: "16-bit Binary to BCD Converter with 7-Segment Display Driver"
-  author: "Aryan"
-  description: "Hardware implementation of a 16-bit binary to BCD converter using double-dabble algorithm with multiplexed 7-segment display driver."
+  title:        "I2C 7-Segment Display Driver"
+  author:       "Aryan Sagar"
+  discord:      "nampak248956"  
+  description:  "I2C slave that receives 32-bit data and displays it on a multiplexed 7-segment display"
+  language:     "Verilog"
+  clock_hz:     10000000   # adjust if your clock is different
 
-  language: "Verilog"
-  clock_hz: 1000
   tiles: "1x1"
 
-  top_module: "tt_um_binary_to_bcd_7seg"
+  top_module:  "tt_um_i2c_display"
 
   source_files:
-    - design.v
+    - "project.v"
 
+# Pinout description
 pinout:
-  ui[0]: "Binary input bit 0"
-  ui[1]: "Binary input bit 1"
-  ui[2]: "Binary input bit 2"
-  ui[3]: "Binary input bit 3"
-  ui[4]: "Binary input bit 4"
-  ui[5]: "Binary input bit 5"
-  ui[6]: "Binary input bit 6"
-  ui[7]: "Binary input bit 7"
+  # Inputs
+  ui[0]: "SCL (I2C clock input)"
+  ui[1]: ""
+  ui[2]: ""
+  ui[3]: ""
+  ui[4]: ""
+  ui[5]: ""
+  ui[6]: ""
+  ui[7]: ""
 
-  uo[0]: "Segment a (cathode)"
-  uo[1]: "Segment b (cathode)"
-  uo[2]: "Segment c (cathode)"
-  uo[3]: "Segment d (cathode)"
-  uo[4]: "Segment e (cathode)"
-  uo[5]: "Segment f (cathode)"
-  uo[6]: "Segment g (cathode)"
-  uo[7]: "Anode select 0"
+  # Outputs (segments)
+  uo[0]: "ANODE_0 (digit select via transistor)"
+  uo[1]: "SEG_A"
+  uo[2]: "SEG_B"
+  uo[3]: "SEG_C"
+  uo[4]: "SEG_D"
+  uo[5]: "SEG_E"
+  uo[6]: "SEG_F"
+  uo[7]: "SEG_G"
 
-  uio[0]: "Binary input bit 8"
-  uio[1]: "Binary input bit 9"
-  uio[2]: "Binary input bit 10"
-  uio[3]: "Binary input bit 11"
-  uio[4]: "Binary input bit 12"
-  uio[5]: "Binary input bit 13"
-  uio[6]: "Binary input bit 14"
-  uio[7]: "Binary input bit 15"
+  # Bidirectional pins
+  uio[0]: "SDA (I2C data)"
+  uio[1]: "ANODE_1"
+  uio[2]: "ANODE_2"
+  uio[3]: "ANODE_3"
+  uio[4]: "ANODE_4"
+  uio[5]: "ANODE_5"
+  uio[6]: "ANODE_6"
+  uio[7]: "ANODE_7"
 
-tags:
-  - display
-  - converter
-  - seven-segment
-  - bcd
+# Do not change!
+yaml_version: 6
