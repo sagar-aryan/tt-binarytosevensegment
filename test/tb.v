@@ -3,21 +3,22 @@
 
 module tb ();
 
-  // Dump waveform
+  // Dump waves
   initial begin
     $dumpfile("tb.fst");
     $dumpvars(0, tb);
     #1;
   end
 
-  // Inputs
+  // ---------------------------------------
+  // Signals (UNCHANGED STRUCTURE)
+  // ---------------------------------------
   reg clk;
   reg rst_n;
   reg ena;
   reg [7:0] ui_in;
   reg [7:0] uio_in;
 
-  // Outputs
   wire [7:0] uo_out;
   wire [7:0] uio_out;
   wire [7:0] uio_oe;
@@ -27,8 +28,10 @@ module tb ();
   wire VGND = 1'b0;
 `endif
 
-  // 👉 Replace this with your actual module name if different
-  tt_um_example user_project (
+  // ---------------------------------------
+  // DUT (FIXED NAME)
+  // ---------------------------------------
+  tt_um_i2c_display user_project (
 
 `ifdef GL_TEST
       .VPWR(VPWR),
@@ -45,52 +48,105 @@ module tb ();
       .rst_n  (rst_n)
   );
 
-  // ✅ Clock generation (100 MHz)
-  initial clk = 0;
+  // ---------------------------------------
+  // Clock
+  // ---------------------------------------
   always #5 clk = ~clk;
 
-  // ✅ Stimulus block
-  initial begin
-    // Initialize everything
-    rst_n  = 0;
-    ena    = 0;
-    ui_in  = 8'd0;
-    uio_in = 8'd0;
+  // ---------------------------------------
+  // I2C EMULATION (ADDED)
+  // ---------------------------------------
 
-    // Apply reset
-    #20;
-    rst_n = 1;
-    ena   = 1;
+  reg sda_master;   // 1 = release, 0 = pull low
+  reg scl_master;
 
-    // ======================
-    // TEST CASES
-    // ======================
+  wire sda_line;
 
-    // Test 1
-    #10;
-    ui_in = 8'h12;
+  // Open drain behavior
+  assign sda_line = (sda_master == 0) ? 1'b0 :
+                    (uio_oe[0] ? 1'b0 : 1'b1);
 
-    // Test 2
-    #10;
-    ui_in = 8'h34;
+  always @(*) begin
+    uio_in[0] = sda_line;
+  end
 
-    // Test 3
-    #10;
-    ui_in = 8'hAB;
+  // SCL is input only
+  always @(*) begin
+    ui_in[0] = scl_master;
+  end
 
-    // Test 4
-    #10;
-    ui_in = 8'hFF;
+  // ---------------------------------------
+  // I2C TASKS (ADDED)
+  // ---------------------------------------
 
-    // If using uio_in (buttons / control)
-    #10;
-    uio_in = 8'h01;
+  task i2c_start;
+  begin
+    sda_master = 1; #100;
+    scl_master = 1; #100;
+    sda_master = 0; #100;
+    scl_master = 0; #100;
+  end
+  endtask
 
-    #10;
-    uio_in = 8'h02;
+  task i2c_stop;
+  begin
+    sda_master = 0; #100;
+    scl_master = 1; #100;
+    sda_master = 1; #100;
+  end
+  endtask
 
-    // Wait and finish
+  task i2c_write_byte;
+    input [7:0] data;
+    integer i;
+  begin
+    for (i = 7; i >= 0; i = i - 1) begin
+      sda_master = data[i];
+      #50;
+      scl_master = 1; #100;
+      scl_master = 0; #100;
+    end
+
+    // ACK cycle
+    sda_master = 1;
     #50;
+    scl_master = 1; #100;
+    scl_master = 0; #100;
+  end
+  endtask
+
+  // ---------------------------------------
+  // TEST SEQUENCE (ADDED)
+  // ---------------------------------------
+
+  initial begin
+    clk = 0;
+    rst_n = 0;
+    ena = 1;
+    ui_in = 0;
+    uio_in = 8'hFF;
+
+    sda_master = 1;
+    scl_master = 1;
+
+    #200;
+    rst_n = 1;
+
+    #200;
+
+    // Send I2C transaction
+    i2c_start;
+
+    i2c_write_byte(8'h68); // address (0x34 << 1)
+    i2c_write_byte(8'h12);
+    i2c_write_byte(8'h34);
+    i2c_write_byte(8'h56);
+    i2c_write_byte(8'h78);
+
+    i2c_stop;
+
+    #100000;
+
     $finish;
   end
 
