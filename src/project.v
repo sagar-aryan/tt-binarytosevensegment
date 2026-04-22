@@ -163,6 +163,7 @@ reg [7:0] data_reg = 8'd0, data_next;
 reg data_valid_reg = 1'b0, data_valid_next;
 reg data_out_reg_valid_reg = 1'b0, data_out_reg_valid_next;
 reg last_reg = 1'b0, last_next;
+reg scl_o_next;
 
 reg mode_read_reg = 1'b0, mode_read_next;
 
@@ -180,7 +181,7 @@ reg [FILTER_LEN-1:0] sda_i_filter = {FILTER_LEN{1'b1}};
 reg scl_i_reg = 1'b1;
 reg sda_i_reg = 1'b1;
 
-reg scl_o_reg = 1'b1, ;
+reg scl_o_reg = 1'b1 ;
 reg sda_o_reg = 1'b1, sda_o_next;
 
 reg last_scl_i_reg = 1'b1;
