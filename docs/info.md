@@ -1,36 +1,82 @@
 ## How it works
 
-This design implements a 16-bit binary to BCD (Binary-Coded Decimal) converter with an optimized 7-segment display driver. The goal is to minimize pin usage — driving 8 seven-segment displays with only 15 wires instead of the usual 56.
+This project implements an I²C-controlled 8-digit 7-segment display driver.
 
-**Architecture:**
-- **Input:** 16-bit unsigned binary value + 1 kHz clock + asynchronous reset
-- **Binary-to-BCD conversion:** Uses the double-dabble algorithm to convert the 16-bit binary input into a 32-bit BCD representation (8 BCD digits, 4 bits each)
-- **Multiplexed display:** A 31:4 multiplexer selects one BCD digit at a time
-- **BCD-to-7-segment decoder:** Converts the selected 4-bit BCD digit into 7-segment cathode signals
-- **Time-division multiplexing:** Cycles through all 8 digits rapidly using the 1 kHz clock, so only one digit is active at any moment
+An external I²C master (such as an ESP32 or microcontroller) sends data bytes to the chip. The design includes an I²C slave interface that receives serial data over the SDA line (with SCL as clock input). The received data is processed and displayed on a multiplexed 7-segment display.
 
-**Pin assignment:**
-- 7 wires for cathode signals (shared across all 8 displays)
-- 8 wires for anode control (one per digit, driving PNP transistors)
-- Total: 15 I/O pins instead of 56
+Internal Working:
+I²C Communication
+The module acts as an I²C slave with a fixed address (0x34).
+Incoming data is received byte-by-byte via SDA.
+The design uses open-drain behavior for SDA.
+Data Storage
+Every 4 bytes received are combined into a 32-bit register.
+Once 4 bytes are received, a data_valid signal is generated.
+Binary to BCD Conversion
+The 32-bit binary number is converted into BCD format using the shift-add-3 (double dabble) algorithm.
+This produces 8 decimal digits for display.
+Multiplexed Display Driving
+A refresh counter continuously cycles through 8 digits.
+A multiplexer selects the correct BCD digit.
+A BCD-to-7-segment decoder converts the digit into segment signals.
+Output Driving
+Segment lines (cathodes) are driven through dedicated output pins.
+Digit select lines (anodes) are driven using transistor-based switching.
+Only one digit is active at a time (multiplexing), creating the illusion of a continuous display.
+🧪 ## How to test
+Required setup:
+I²C master (ESP32 / Arduino / FPGA)
+7-segment display (8-digit, multiplexed)
+Pull-up resistors on SDA and SCL (typically 4.7kΩ)
+Steps:
+Power the design
+Provide clock and reset signals.
+Ensure pull-up resistors are connected to SDA and SCL.
+Connect I²C master
+SDA → chip SDA pin
+SCL → chip SCL pin
+Send data over I²C
+Use slave address: 0x34
+Send 4 bytes (32-bit data)
 
-The displays are common-anode types with anodes tied together and controlled via PNP transistors. By rapidly cycling through digits (persistence of vision), all 8 digits appear continuously lit to the human eye.
+Example (ESP32 / Arduino pseudo-code):
 
-## How to test
+Wire.beginTransmission(0x34);
+Wire.write(0x12);
+Wire.write(0x34);
+Wire.write(0x56);
+Wire.write(0x78);
+Wire.endTransmission();
+Observe output
+The transmitted 32-bit value will be displayed as decimal digits on the 7-segment display.
+The display continuously refreshes using multiplexing.
+🔌 ## External hardware
 
-1. Connect 8 common-anode seven-segment displays via PNP transistor drivers
-   - Wire cathodes (a-g) to the 7 cathode output pins (shared across all displays)
-   - Wire each display's anode through a PNP transistor to one of the 8 anode control pins
-2. Provide a 1 kHz clock input
-3. Assert and release reset (`rst_n`)
-4. Apply a 16-bit binary test value (e.g., `0x1234` = 4660 decimal)
-5. Observe the decimal equivalent displayed across the 8 seven-segment digits
+The following external components are required:
 
-**Expected output:** The 16-bit binary input displayed as its decimal equivalent (0 to 65535) across 8 digits, with leading zeros shown or blanked depending on implementation.
+1. 7-Segment Display
+8-digit multiplexed 7-segment display
+Common anode or common cathode depending on transistor configuration
+2. Transistor Driver Circuit (IMPORTANT)
+Required for driving digit anodes
+Ensures sufficient current for LEDs
 
-## External hardware
+Recommended:
 
-- 8× common-anode seven-segment displays
-- 8× PNP transistors (e.g., 2N3906 or equivalent) for anode switching
-- Current-limiting resistors for cathode segments (typically 220Ω–330Ω per segment)
-- Pull-up/pull-down resistors as needed for transistor base connections
+NPN transistors (e.g., BC547) or NMOS
+Base resistor (~1kΩ–10kΩ)
+3. Pull-up Resistors
+SDA → 4.7kΩ to VCC
+SCL → 4.7kΩ to VCC
+4. I²C Master Device
+ESP32 / Arduino / Raspberry Pi / FPGA
+5. Power Supply
+Typically 3.3V or 5V (depending on display and logic compatibility)
+💡 Final Note
+
+This design demonstrates:
+
+I²C protocol handling
+Serial-to-parallel data conversion
+Binary-to-BCD conversion
+Multiplexed display control under strict pin constraints
