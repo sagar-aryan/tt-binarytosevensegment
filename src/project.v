@@ -794,7 +794,7 @@ end
 endmodule
 
 module i2c_slave_8_sevengenment_driver(inout  wire sda,
-                                       inout  wire scl,
+                                       input  wire scl,
                                        input  wire clk,
                                        input  wire reset,
                                        output [6:0]cathode,
@@ -817,13 +817,3 @@ i2c_32bit_store a0(clk,reset,sda,scl,data_32bit,data_valid);
 eight_driver a1(cathode,anode,data_32bit[26:0],data_valid,clk,reset);
 endmodule
 
-/*module i2c_slave_8_sevengenment_driver(inout  wire sda,
-                                       input  wire scl,
-                                       input  wire clk,
-                                       input  wire reset,
-                                       output [6:0]cathode,
-                                       output [7:0]anode
-                                        );*/
-module fpga_top_display(inout sda,inout scl,input clk,input btnC,output [6:0]seg,output [7:0]an);
-i2c_slave_8_sevengenment_driver(sda,scl,clk,btnC,seg,an );
-endmodule
