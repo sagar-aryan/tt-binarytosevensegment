@@ -234,7 +234,7 @@ always @* begin
     m_axis_data_tvalid_next = m_axis_data_tvalid_reg && !m_axis_data_tready;
     m_axis_data_tlast_next = m_axis_data_tlast_reg;
 
-    scl_o_next = 1'b0;
+    scl_o_next = 1'b1;
     sda_o_next = sda_o_reg;
 
     bus_addressed_next = bus_addressed_reg;
@@ -314,7 +314,7 @@ always @* begin
                     sda_o_next = 1'b1;
                     if (m_axis_data_tvalid && !m_axis_data_tready) begin
                         // data waiting in output register, so stretch clock
-                        scl_o_next = 1'b0;
+                        scl_o_next = 1'b1;
                         state_next = STATE_WRITE_1;
                     end else begin
                         scl_o_next = 1'b1;
@@ -366,7 +366,7 @@ always @* begin
                     // shift out data bit
                     if (!data_valid_reg) begin
                         // waiting for data, so stretch clock
-                        scl_o_next = 1'b0;
+                        scl_o_next = 1'b1;
                         state_next = STATE_READ_1;
                     end else begin
                         scl_o_next = 1'b1;
