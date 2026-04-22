@@ -27,7 +27,7 @@ module tt_um_uart_8digit (
                         );*/
     wire rst;
     assign rst=~rst_n;
-    uart_eight_driver tinytapeout(.cathode(u0_out[7:1]),
+    uart_eight_driver tinytapeout(.cathode(uo_out[7:1]),
                                   .anode(uio_out),
                                   .tx(uo_out[0]),
                                   .rx(ui_in[0]),
