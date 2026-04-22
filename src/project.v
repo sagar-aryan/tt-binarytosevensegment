@@ -1,612 +1,212 @@
 /*
- * Copyright (c) 2025 Aryan
+ * Copyright (c) 2024 Aryan Sagar
  * SPDX-License-Identifier: Apache-2.0
  */
+
 `default_nettype none
 
-module tt_um_i2c_display (
+module tt_um_uart_8digit (
     input  wire [7:0] ui_in,    // Dedicated inputs
     output wire [7:0] uo_out,   // Dedicated outputs
     input  wire [7:0] uio_in,   // IOs: Input path
     output wire [7:0] uio_out,  // IOs: Output path
     output wire [7:0] uio_oe,   // IOs: Enable path (active high: 0=input, 1=output)
-    input  wire       ena,      // always 1 when the design is powered
+    input  wire       ena,      // always 1 when the design is powered, so you can ignore it
     input  wire       clk,      // clock
     input  wire       rst_n     // reset_n - low to reset
 );
 
-    // ========================================
-    // Pin Assignments
-    localparam SDA_PIN = 0;   
-    
-    // Internal I2C signals
-    wire sda_in, sda_out;    
-    
-    // Seven-segment outputs (7 cathodes + dp on uo_out[7:0])
-    // Anodes will need to use remaining uio pins
-    wire [6:0] cathode;
-    wire [7:0] anode;
-    
-    // Reset (active high internally)
-    wire reset;
-    assign reset = !rst_n;
-    
-    // ========================================
-    // I2C Bidirectional Pin Handling
-    // ========================================
-    // Read inputs
-    assign sda_in = uio_in[SDA_PIN];
-    
-    
-    // Open-drain outputs (always drive 0, use OE to control)
-    assign uio_out[SDA_PIN] = 1'b0;
-    
-    
-    // Output enable (1 = drive low, 0 = hi-z/pulled high)
-    assign uio_oe[SDA_PIN] = !sda_out;  // OE=1 when sda_out=0 (drive low)
- 
-    
-    // ========================================
-    // Inout wire emulation for module
-    // ========================================
-    wire sda_wire;
-    
-    // Simulate inout behavior
-    assign sda_wire = sda_out ? 1'bz : 1'b0;
-   
-    wire scl_wire;
-    assign scl_wire = ui_in[0];
-    // ========================================
-    // Seven-Segment Display Outputs
-    // ========================================
-    // Use uo_out for 7-segment cathodes (+ dp if needed)
-    assign uo_out[7:1] = cathode;
-    assign {uo_out[0],uio_out[7:1]}=anode;
-    assign uio_oe[7:1]  = 7'b1111111;
-    
-    
-    // Use remaining uio pins for anodes (uio[7:2] = 6 anodes)
-    // Note: You have 8 anodes but only 6 available pins - you'll need to multiplex
-    // or reduce to 6 digits
-   
-    
-    // ========================================
-    // Your I2C Display Module
-    // ========================================
-    i2c_slave_8_sevengenment_driver core (
-        .sda(sda_wire),
-        .scl(scl_wire),
-        .clk(clk),
-        .reset(reset),
-        .cathode(cathode),
-        .anode(anode)
-    );
-    
-    // ========================================
-    // Unused inputs
-    // ========================================
-    wire _unused = &{ena, ui_in, 1'b0};
+  // All output pins must be assigned. If not used, assign to 0.
+    /*uart_eight_driver(
+                        output [6:0]cathode,
+                        output [7:0]anode,
+                        output tx,
+                        input rx,
+                        input clk,
+                        input reset
+                        );*/
+    wire rst;
+    assign rst=~rst_n;
+    uart_eight_driver tinytapeout(.cathode(u0_out[7:1]),
+                                  .anode(uio_out),
+                                  .tx(uo_out[0]),
+                                  .rx(ui_in[0]),
+                                  .clk(clk),
+                                  .reset(rst)
+                                 );
+  
+  assign uio_oe=8'b11111111;
+  // List all unused inputs to prevent warnings
+    wire _unused = &{ena,ui_in,1'b0};
 
 endmodule
 
 
 
-`timescale 1ns / 1ps
 
-/*
- * I2C slave
- */
-module i2c_slave #(
-    parameter FILTER_LEN = 4
+module uart_accumulator #
+(
+    parameter DATA_WIDTH = 8
 )
 (
-    input wire         clk,
-    input wire         rst,
+    input wire clk,
+    input wire rst,
 
-    /*
-     * Host interface
-     */
-    input  wire        release_bus,
+    input wire [DATA_WIDTH-1:0] rx_tdata,
+    input wire rx_tvalid,
+    output reg rx_tready,
 
-    input  wire [7:0]  s_axis_data_tdata,
-    input  wire        s_axis_data_tvalid,
-    output wire        s_axis_data_tready,
-    input  wire        s_axis_data_tlast,
-
-    output wire [7:0]  m_axis_data_tdata,
-    output wire        m_axis_data_tvalid,
-    input  wire        m_axis_data_tready,
-    output wire        m_axis_data_tlast,
-
-    /*
-     * I2C interface
-     */
-    input  wire        scl_i,
-    output wire        scl_o,
-    output wire        scl_t,
-    input  wire        sda_i,
-    output wire        sda_o,
-    output wire        sda_t,
-
-    /*
-     * Status
-     */
-    output wire        busy,
-    output wire [6:0]  bus_address,
-    output wire        bus_addressed,
-    output wire        bus_active,
-
-    /*
-     * Configuration
-     */
-    input  wire        enable,
-    input  wire [6:0]  device_address,
-    input  wire [6:0]  device_address_mask
-);
-
-
-
-localparam [4:0]
-    STATE_IDLE = 4'd0,
-    STATE_ADDRESS = 4'd1,
-    STATE_ACK = 4'd2,
-    STATE_WRITE_1 = 4'd3,
-    STATE_WRITE_2 = 4'd4,
-    STATE_READ_1 = 4'd5,
-    STATE_READ_2 = 4'd6,
-    STATE_READ_3 = 4'd7;
-
-reg [4:0] state_reg = STATE_IDLE, state_next;
-
-reg [6:0] addr_reg = 7'd0, addr_next;
-reg [7:0] data_reg = 8'd0, data_next;
-reg data_valid_reg = 1'b0, data_valid_next;
-reg data_out_reg_valid_reg = 1'b0, data_out_reg_valid_next;
-reg last_reg = 1'b0, last_next;
-
-reg mode_read_reg = 1'b0, mode_read_next;
-
-reg [3:0] bit_count_reg = 4'd0, bit_count_next;
-
-reg s_axis_data_tready_reg = 1'b0, s_axis_data_tready_next;
-
-reg [7:0] m_axis_data_tdata_reg = 8'd0, m_axis_data_tdata_next;
-reg m_axis_data_tvalid_reg = 1'b0, m_axis_data_tvalid_next;
-reg m_axis_data_tlast_reg = 1'b0, m_axis_data_tlast_next;
-
-reg [FILTER_LEN-1:0] scl_i_filter = {FILTER_LEN{1'b1}};
-reg [FILTER_LEN-1:0] sda_i_filter = {FILTER_LEN{1'b1}};
-
-reg scl_i_reg = 1'b1;
-reg sda_i_reg = 1'b1;
-
-reg scl_o_reg = 1'b1, scl_o_next;
-reg sda_o_reg = 1'b1, sda_o_next;
-
-reg last_scl_i_reg = 1'b1;
-reg last_sda_i_reg = 1'b1;
-
-reg busy_reg = 1'b0;
-reg bus_active_reg = 1'b0;
-reg bus_addressed_reg = 1'b0, bus_addressed_next;
-
-assign bus_address = addr_reg;
-
-assign s_axis_data_tready = s_axis_data_tready_reg;
-
-assign m_axis_data_tdata = m_axis_data_tdata_reg;
-assign m_axis_data_tvalid = m_axis_data_tvalid_reg;
-assign m_axis_data_tlast = m_axis_data_tlast_reg;
-
-assign scl_o = scl_o_reg;
-assign scl_t = scl_o_reg;
-assign sda_o = sda_o_reg;
-assign sda_t = sda_o_reg;
-
-assign busy = busy_reg;
-assign bus_active = bus_active_reg;
-assign bus_addressed = bus_addressed_reg;
-
-assign scl_posedge = scl_i_reg && !last_scl_i_reg;
-assign scl_negedge = !scl_i_reg && last_scl_i_reg;
-assign sda_posedge = sda_i_reg && !last_sda_i_reg;
-assign sda_negedge = !sda_i_reg && last_sda_i_reg;
-
-assign start_bit = sda_negedge && scl_i_reg;
-assign stop_bit = sda_posedge && scl_i_reg;
-
-always @* begin
-    state_next = STATE_IDLE;
-
-    addr_next = addr_reg;
-    data_next = data_reg;
-    data_valid_next = data_valid_reg;
-    data_out_reg_valid_next = data_out_reg_valid_reg;
-    last_next = last_reg;
-
-    mode_read_next = mode_read_reg;
-
-    bit_count_next = bit_count_reg;
-
-    s_axis_data_tready_next = 1'b0;
-
-    m_axis_data_tdata_next = m_axis_data_tdata_reg;
-    m_axis_data_tvalid_next = m_axis_data_tvalid_reg && !m_axis_data_tready;
-    m_axis_data_tlast_next = m_axis_data_tlast_reg;
-
-    scl_o_next = scl_o_reg;
-    sda_o_next = sda_o_reg;
-
-    bus_addressed_next = bus_addressed_reg;
-
-    if (start_bit) begin
-        // got start bit, latch out data, read address
-        data_valid_next = 1'b0;
-        data_out_reg_valid_next = 1'b0;
-        bit_count_next = 4'd7;
-        m_axis_data_tlast_next = 1'b1;
-        m_axis_data_tvalid_next = data_out_reg_valid_reg;
-        bus_addressed_next = 1'b0;
-        state_next = STATE_ADDRESS;
-    end else if (release_bus || stop_bit) begin
-        // got stop bit or release bus command, latch out data, return to idle
-        data_valid_next = 1'b0;
-        data_out_reg_valid_next = 1'b0;
-        m_axis_data_tlast_next = 1'b1;
-        m_axis_data_tvalid_next = data_out_reg_valid_reg;
-        bus_addressed_next = 1'b0;
-        state_next = STATE_IDLE;
-    end else begin
-        case (state_reg)
-            STATE_IDLE: begin
-                // line idle
-                data_valid_next = 1'b0;
-                data_out_reg_valid_next = 1'b0;
-                bus_addressed_next = 1'b0;
-                state_next = STATE_IDLE;
-            end
-            STATE_ADDRESS: begin
-                // read address
-                if (scl_posedge) begin
-                    if (bit_count_reg > 0) begin
-                        // shift in address
-                        bit_count_next = bit_count_reg-1;
-                        data_next = {data_reg[6:0], sda_i_reg};
-                        state_next = STATE_ADDRESS;
-                    end else begin
-                        // check address
-                        if (enable && (device_address & device_address_mask) == (data_reg[6:0] & device_address_mask)) begin
-                            // it's a match, save read/write bit and send ACK
-                            addr_next = data_reg[6:0];
-                            mode_read_next = sda_i_reg;
-                            bus_addressed_next = 1'b1;
-                            state_next = STATE_ACK;
-                        end else begin
-                            // no match, return to idle
-                            state_next = STATE_IDLE;
-                        end
-                    end
-                end else begin
-                    state_next = STATE_ADDRESS;
-                end
-            end
-            STATE_ACK: begin
-                // send ACK bit
-                if (scl_negedge) begin
-                    sda_o_next = 1'b0;
-                    bit_count_next = 4'd7;
-                    if (mode_read_reg) begin
-                        // reading
-                        s_axis_data_tready_next = 1'b1;
-                        data_valid_next = 1'b0;
-                        state_next = STATE_READ_1;
-                    end else begin
-                        // writing
-                        state_next = STATE_WRITE_1;
-                    end
-                end else begin
-                    state_next = STATE_ACK;
-                end
-            end
-            STATE_WRITE_1: begin
-                // write data byte
-                if (scl_negedge || !scl_o_reg) begin
-                    sda_o_next = 1'b1;
-                    if (m_axis_data_tvalid && !m_axis_data_tready) begin
-                        // data waiting in output register, so stretch clock
-                        scl_o_next = 1'b0;
-                        state_next = STATE_WRITE_1;
-                    end else begin
-                        scl_o_next = 1'b1;
-                        if (data_valid_reg) begin
-                            // store data in output register
-                            m_axis_data_tdata_next = data_reg;
-                            m_axis_data_tlast_next = 1'b0;
-                        end
-                        data_valid_next = 1'b0;
-                        data_out_reg_valid_next = data_valid_reg;
-                        state_next = STATE_WRITE_2;
-                    end
-                end else begin
-                    state_next = STATE_WRITE_1;
-                end
-            end
-            STATE_WRITE_2: begin
-                // write data byte
-                if (scl_posedge) begin
-                    // shift in data bit
-                    data_next = {data_reg[6:0], sda_i_reg};
-                    if (bit_count_reg > 0) begin
-                        bit_count_next = bit_count_reg-1;
-                        state_next = STATE_WRITE_2;
-                    end else begin
-                        // latch out previous data byte since we now know it's not the last one
-                        m_axis_data_tvalid_next = data_out_reg_valid_reg;
-                        data_out_reg_valid_next = 1'b0;
-                        data_valid_next = 1'b1;
-                        state_next = STATE_ACK;
-                    end
-                end else begin
-                    state_next = STATE_WRITE_2;
-                end
-            end
-            STATE_READ_1: begin
-                // read data byte
-                if (s_axis_data_tready && s_axis_data_tvalid) begin
-                    // data valid; latch it in
-                    s_axis_data_tready_next = 1'b0;
-                    data_next = s_axis_data_tdata;
-                    data_valid_next = 1'b1;
-                end else begin
-                    // keep ready high if we're waiting for data
-                    s_axis_data_tready_next = !data_valid_reg;
-                end
-
-                if (scl_negedge || !scl_o_reg) begin
-                    // shift out data bit
-                    if (!data_valid_reg) begin
-                        // waiting for data, so stretch clock
-                        scl_o_next = 1'b0;
-                        state_next = STATE_READ_1;
-                    end else begin
-                        scl_o_next = 1'b1;
-                        {sda_o_next, data_next} = {data_reg, 1'b0};
-                        
-                        if (bit_count_reg > 0) begin
-                            bit_count_next = bit_count_reg-1;
-                            state_next = STATE_READ_1;
-                        end else begin
-                            state_next = STATE_READ_2;
-                        end
-                    end
-                end else begin
-                    state_next = STATE_READ_1;
-                end
-            end
-            STATE_READ_2: begin
-                // read ACK bit
-                if (scl_negedge) begin
-                    // release SDA
-                    sda_o_next = 1'b1;
-                    state_next = STATE_READ_3;
-                end else begin
-                    state_next = STATE_READ_2;
-                end
-            end
-            STATE_READ_3: begin
-                // read ACK bit
-                if (scl_posedge) begin
-                    if (sda_i_reg) begin
-                        // NACK, return to idle
-                        state_next = STATE_IDLE;
-                    end else begin
-                        // ACK, read another byte
-                        bit_count_next = 4'd7;
-                        s_axis_data_tready_next = 1'b1;
-                        data_valid_next = 1'b0;
-                        state_next = STATE_READ_1;
-                    end
-                end else begin
-                    state_next = STATE_READ_3;
-                end
-            end
-        endcase
-    end
-end
-
-always @(posedge clk) begin
-    state_reg <= state_next;
-
-    addr_reg <= addr_next;
-    data_reg <= data_next;
-    data_valid_reg <= data_valid_next;
-    data_out_reg_valid_reg <= data_out_reg_valid_next;
-    last_reg <= last_next;
-
-    mode_read_reg <= mode_read_next;
-
-    bit_count_reg <= bit_count_next;
-
-    s_axis_data_tready_reg <= s_axis_data_tready_next;
-
-    m_axis_data_tdata_reg <= m_axis_data_tdata_next;
-    m_axis_data_tvalid_reg <= m_axis_data_tvalid_next;
-    m_axis_data_tlast_reg <= m_axis_data_tlast_next;
-
-    scl_i_filter <= (scl_i_filter << 1) | scl_i;
-    sda_i_filter <= (sda_i_filter << 1) | sda_i;
-
-    if (scl_i_filter == {FILTER_LEN{1'b1}}) begin
-        scl_i_reg <= 1'b1;
-    end else if (scl_i_filter == {FILTER_LEN{1'b0}}) begin
-        scl_i_reg <= 1'b0;
-    end
-
-    if (sda_i_filter == {FILTER_LEN{1'b1}}) begin
-        sda_i_reg <= 1'b1;
-    end else if (sda_i_filter == {FILTER_LEN{1'b0}}) begin
-        sda_i_reg <= 1'b0;
-    end
-
-    scl_o_reg <= scl_o_next;
-    sda_o_reg <= sda_o_next;
-
-    last_scl_i_reg <= scl_i_reg;
-    last_sda_i_reg <= sda_i_reg;
-
-    busy_reg <= !(state_reg == STATE_IDLE);
-
-    if (start_bit) begin
-        bus_active_reg <= 1'b1;
-    end else if (stop_bit) begin
-        bus_active_reg <= 1'b0;
-    end else begin
-        bus_active_reg <= bus_active_reg;
-    end
-
-    bus_addressed_reg <= bus_addressed_next;
-
-    if (rst) begin
-        state_reg <= STATE_IDLE;
-        s_axis_data_tready_reg <= 1'b0;
-        m_axis_data_tvalid_reg <= 1'b0;
-        scl_o_reg <= 1'b1;
-        sda_o_reg <= 1'b1;
-        busy_reg <= 1'b0;
-        bus_active_reg <= 1'b0;
-        bus_addressed_reg <= 1'b0;
-    end
-end
-
-endmodule
-
-
-
-
-
-
-module i2c_32bit_store (
-    input  wire clk,
-    input  wire rst,
-
-    inout  wire sda,
-    input  wire scl,
-
-    output reg [31:0] data_32bit,
+    output reg [31:0] data_out,
     output reg data_valid
 );
 
-    // =============================
-    // I2C signals
-    // =============================
-    wire [7:0] rx_data;
-    wire rx_valid;
-
-    reg [7:0] tx_data;
-    reg tx_valid;
-    wire tx_ready;
-
-    // =============================
-    // Internal storage
-    // =============================
     reg [1:0] byte_count;
 
-    // =============================
-    // I2C core wiring (NO clock stretch)
-    // =============================
-    wire scl_i = scl;
-    wire sda_i, sda_o;
-
-    assign sda_i = sda;
-    assign sda   = sda_o ? 1'bz : 1'b0;
-
-    // DO NOT DRIVE SCL
-    // (you already learned this lesson 😄)
-
-    // =============================
-    // I2C SLAVE INSTANCE
-    // =============================
-    i2c_slave uut (
-        .clk(clk),
-        .rst(rst),
-
-        .release_bus(1'b0),
-
-        // WRITE (Master → FPGA)
-        .m_axis_data_tdata(rx_data),
-        .m_axis_data_tvalid(rx_valid),
-        .m_axis_data_tready(1'b1),
-        .m_axis_data_tlast(),
-
-        // READ (optional, keep simple)
-        .s_axis_data_tdata(tx_data),
-        .s_axis_data_tvalid(tx_valid),
-        .s_axis_data_tready(tx_ready),
-        .s_axis_data_tlast(1'b0),
-
-        // I2C
-        .scl_i(scl_i),
-        .scl_o(),   // NOT USED
-        .scl_t(),
-        .sda_i(sda_i),
-        .sda_o(sda_o),
-        .sda_t(),
-
-        // Status
-        .busy(),
-        .bus_address(),
-        .bus_addressed(),
-        .bus_active(),
-
-        // Config
-        .enable(1'b1),
-        .device_address(7'h34),
-        .device_address_mask(7'h7F)
-    );
-
-    // =============================
-    // 32-BIT ACCUMULATION LOGIC
-    // =============================
-    always @(posedge clk) begin
+    always @(posedge clk or posedge rst) begin
         if (rst) begin
-            data_32bit   <= 32'd0;
-            byte_count   <= 2'd0;
-            data_valid   <= 1'b0;
+            data_out   <= 0;
+            data_valid <= 0;
+            byte_count <= 0;
+            rx_tready  <= 1;
         end else begin
-            data_valid <= 1'b0;  // default
+            data_valid <= 0;
 
-            if (rx_valid) begin
-                // shift left and insert new byte
-                data_32bit <= {data_32bit[23:0], rx_data};
+            if (rx_tvalid && rx_tready) begin
+                data_out <= {rx_tdata, data_out[31:8]};
+                byte_count <= byte_count + 1;
 
-                if (byte_count == 2'd3) begin
-                    byte_count <= 2'd0;
-                    data_valid <= 1'b1;  // 4 bytes complete
-                end else begin
-                    byte_count <= byte_count + 1'b1;
+                if (byte_count == 3) begin
+                    data_valid <= 1;
+                    byte_count <= 0;
                 end
             end
         end
     end
 
-    // =============================
-    // OPTIONAL: echo MSB on read
-    // =============================
-   always @(posedge clk) begin
+endmodule
+
+
+module uart_accumulator_top #
+(
+    parameter DATA_WIDTH = 8
+)
+(
+    input  wire clk,
+    input  wire rst,
+
+    // UART pins
+    input  wire rxd,
+    output wire txd,
+
+    // Output data
+    output wire [31:0] data_out,
+    output wire        data_valid,
+
+    // Config
+    input  wire [15:0] prescale
+);
+
+// ================= RX SIDE =================
+wire [DATA_WIDTH-1:0] rx_tdata;
+wire                  rx_tvalid;
+wire                  rx_tready;
+
+uart_rx #(
+    .DATA_WIDTH(DATA_WIDTH)
+)
+uart_rx_inst (
+    .clk(clk),
+    .rst(rst),
+
+    .m_axis_tdata(rx_tdata),
+    .m_axis_tvalid(rx_tvalid),
+    .m_axis_tready(rx_tready),
+
+    .rxd(rxd),
+
+    .busy(),
+    .overrun_error(),
+    .frame_error(),
+
+    .prescale(prescale)
+);
+
+// ================= ACCUMULATOR =================
+wire acc_valid;
+
+uart_accumulator #(
+    .DATA_WIDTH(DATA_WIDTH)
+)
+acc_inst (
+    .clk(clk),
+    .rst(rst),
+
+    .rx_tdata(rx_tdata),
+    .rx_tvalid(rx_tvalid),
+    .rx_tready(rx_tready),
+
+    .data_out(data_out),
+    .data_valid(acc_valid)
+);
+
+assign data_valid = acc_valid;
+
+// ================= ACK LOGIC =================
+
+// TX AXI signals
+reg  [7:0] tx_tdata_reg;
+reg        tx_tvalid_reg;
+wire       tx_tready;
+
+// ACK byte
+localparam ACK = 8'h06;
+
+// Simple FSM
+reg sending_ack;
+
+always @(posedge clk) begin
     if (rst) begin
-        tx_valid <= 0;
+        tx_tvalid_reg <= 0;
+        tx_tdata_reg  <= 0;
+        sending_ack   <= 0;
     end else begin
-        if (!tx_valid && tx_ready) begin
-            tx_data  <= data_32bit[31:24];
-            tx_valid <= 1'b1;
-        end else if (tx_valid && tx_ready) begin
-            tx_valid <= 1'b0;
+        // Default
+        if (tx_tvalid_reg && tx_tready)
+            tx_tvalid_reg <= 0;
+
+        // Trigger ACK when 32-bit data is ready
+        if (acc_valid && !sending_ack) begin
+            tx_tdata_reg  <= ACK;
+            tx_tvalid_reg <= 1;
+            sending_ack   <= 1;
+        end
+
+        // Clear sending flag after send
+        if (sending_ack && tx_tvalid_reg && tx_tready) begin
+            sending_ack <= 0;
         end
     end
 end
 
-endmodule
+// ================= TX =================
+uart_tx #(
+    .DATA_WIDTH(DATA_WIDTH)
+)
+uart_tx_inst (
+    .clk(clk),
+    .rst(rst),
 
+    .s_axis_tdata(tx_tdata_reg),
+    .s_axis_tvalid(tx_tvalid_reg),
+    .s_axis_tready(tx_tready),
+
+    .txd(txd),
+
+    .busy(),
+    .prescale(prescale)
+);
+
+endmodule
 
 module clock_divider(output clk_out, input clk_in,reset);
     reg [15:0]internal;
@@ -792,28 +392,56 @@ end
    binary_bcd_decoder a4(clk_in,reset,start_pulse,latched_data,binary_bcd_out,done);
 endmodule
 
-module i2c_slave_8_sevengenment_driver(inout  wire sda,
-                                       input  wire scl,
-                                       input  wire clk,
-                                       input  wire reset,
-                                       output [6:0]cathode,
-                                       output [7:0]anode
-                                        );
-wire data_valid;
-wire [31:0]data_32bit;
-/*module i2c_32bit_store (
+
+/*module uart_accumulator_top #
+(
+    parameter DATA_WIDTH = 8
+)
+(
     input  wire clk,
     input  wire rst,
 
-    inout  wire sda,
-    input  wire scl,
+    // UART pins
+    input  wire rxd,
+    output wire txd,
 
-    output reg [31:0] data_32bit,
-    output reg data_valid
+    // Output data
+    output wire [31:0] data_out,
+    output wire        data_valid,
+
+    // Config
+    input  wire [15:0] prescale
 );*/
-i2c_32bit_store a0(clk,reset,sda,scl,data_32bit,data_valid);
-//eight_driver(output [6:0]cathode,output [7:0]anode,input [26:0]decimal,input data_32bit_valid,clk_in,reset);
-eight_driver a1(cathode,anode,data_32bit[26:0],data_valid,clk,reset);
-endmodule
+//module eight_driver(output [6:0]cathode,output [7:0]anode,input [26:0]decimal,input data_32bit_valid,clk_in,reset);
+module uart_eight_driver(
+                        output [6:0]cathode,
+                        output [7:0]anode,
+                        output tx,
+                        input rx,
+                        input clk,
+                        input reset
+                        );
+    wire data_valid;
+    wire [31:0]data_out;
+     // UART module
+    uart_accumulator_top uart_inst (
+        .clk(clk),
+        .rst(reset),
+        .rxd(rx),
+        .txd(tx),
+        .data_out(data_out),
+        .data_valid(data_valid),
+        .prescale(16'd109)
+    );
 
+    // 8-digit display driver
+    eight_driver display_inst (
+        .cathode(cathode),
+        .anode(anode),
+        .decimal(data_out[26:0]),   // truncate to 27-bit
+        .data_32bit_valid(data_valid),
+        .clk_in(clk),
+        .reset(reset)
+    );
+endmodule
 
