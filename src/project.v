@@ -198,8 +198,8 @@ assign m_axis_data_tdata = m_axis_data_tdata_reg;
 assign m_axis_data_tvalid = m_axis_data_tvalid_reg;
 assign m_axis_data_tlast = m_axis_data_tlast_reg;
 
-assign scl_o = scl_o_reg;
-assign scl_t = scl_o_reg;
+assign scl_o = 1'b1;
+assign scl_t = 1'b1;
 assign sda_o = sda_o_reg;
 assign sda_t = sda_o_reg;
 
