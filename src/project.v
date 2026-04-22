@@ -91,8 +91,7 @@ endmodule
 
 
 
-
-
+`timescale 1ns / 1ps
 
 /*
  * I2C slave
@@ -146,6 +145,7 @@ module i2c_slave #(
 );
 
 
+
 localparam [4:0]
     STATE_IDLE = 4'd0,
     STATE_ADDRESS = 4'd1,
@@ -163,7 +163,6 @@ reg [7:0] data_reg = 8'd0, data_next;
 reg data_valid_reg = 1'b0, data_valid_next;
 reg data_out_reg_valid_reg = 1'b0, data_out_reg_valid_next;
 reg last_reg = 1'b0, last_next;
-reg scl_o_next;
 
 reg mode_read_reg = 1'b0, mode_read_next;
 
@@ -181,7 +180,7 @@ reg [FILTER_LEN-1:0] sda_i_filter = {FILTER_LEN{1'b1}};
 reg scl_i_reg = 1'b1;
 reg sda_i_reg = 1'b1;
 
-reg scl_o_reg = 1'b1 ;
+reg scl_o_reg = 1'b1, scl_o_next;
 reg sda_o_reg = 1'b1, sda_o_next;
 
 reg last_scl_i_reg = 1'b1;
@@ -199,8 +198,8 @@ assign m_axis_data_tdata = m_axis_data_tdata_reg;
 assign m_axis_data_tvalid = m_axis_data_tvalid_reg;
 assign m_axis_data_tlast = m_axis_data_tlast_reg;
 
-assign scl_o = 1'b1;
-assign scl_t = 1'b1;
+assign scl_o = scl_o_reg;
+assign scl_t = scl_o_reg;
 assign sda_o = sda_o_reg;
 assign sda_t = sda_o_reg;
 
@@ -235,7 +234,7 @@ always @* begin
     m_axis_data_tvalid_next = m_axis_data_tvalid_reg && !m_axis_data_tready;
     m_axis_data_tlast_next = m_axis_data_tlast_reg;
 
-    scl_o_next = 1'b1;
+    scl_o_next = scl_o_reg;
     sda_o_next = sda_o_reg;
 
     bus_addressed_next = bus_addressed_reg;
@@ -315,7 +314,7 @@ always @* begin
                     sda_o_next = 1'b1;
                     if (m_axis_data_tvalid && !m_axis_data_tready) begin
                         // data waiting in output register, so stretch clock
-                        scl_o_next = 1'b1;
+                        scl_o_next = 1'b0;
                         state_next = STATE_WRITE_1;
                     end else begin
                         scl_o_next = 1'b1;
@@ -367,7 +366,7 @@ always @* begin
                     // shift out data bit
                     if (!data_valid_reg) begin
                         // waiting for data, so stretch clock
-                        scl_o_next = 1'b1;
+                        scl_o_next = 1'b0;
                         state_next = STATE_READ_1;
                     end else begin
                         scl_o_next = 1'b1;
@@ -480,7 +479,6 @@ always @(posedge clk) begin
 end
 
 endmodule
-
 
 
 
@@ -817,4 +815,5 @@ i2c_32bit_store a0(clk,reset,sda,scl,data_32bit,data_valid);
 //eight_driver(output [6:0]cathode,output [7:0]anode,input [26:0]decimal,input data_32bit_valid,clk_in,reset);
 eight_driver a1(cathode,anode,data_32bit[26:0],data_valid,clk,reset);
 endmodule
+
 
