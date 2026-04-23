@@ -78,7 +78,7 @@ async def test_project(dut):
     dut._log.info("PASS: uio_oe == 0xFF")
 
     # Test 1: decimal 1  (0x00_00_00_01)
-   await send_packet(dut, 0x01, 0x00, 0x00, 0x00)
+    await send_packet(dut, 0x01, 0x00, 0x00, 0x00)
     dut._log.info(f"After packet 1 – uo_out=0x{int(dut.uo_out.value):02X}  uio_out=0x{int(dut.uio_out.value):02X}")
 
     # Test 2: decimal 123456  (0x00_01_E2_40)
@@ -90,7 +90,7 @@ async def test_project(dut):
     dut._log.info(f"After packet 3 – uo_out=0x{int(dut.uo_out.value):02X}  uio_out=0x{int(dut.uio_out.value):02X}")
 
     # Test 4: all zeros
-   await send_packet(dut, 0x00, 0x00, 0x00, 0x00) 
+    await send_packet(dut, 0x00, 0x00, 0x00, 0x00)
     dut._log.info(f"After packet 4 – uo_out=0x{int(dut.uo_out.value):02X}  uio_out=0x{int(dut.uio_out.value):02X}")
 
     # uio_oe must still be 0xFF throughout
