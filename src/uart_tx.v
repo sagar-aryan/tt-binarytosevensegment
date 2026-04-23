@@ -1,5 +1,3 @@
-
-
 `timescale 1ns / 1ps
 
 /*
@@ -43,7 +41,7 @@ reg txd_reg = 1;
 reg busy_reg = 0;
 
 reg [DATA_WIDTH:0] data_reg = 0;
-reg [18:0] prescale_reg = 0;
+reg [9:0] prescale_reg = 0;
 reg [3:0] bit_cnt = 0;
 
 assign s_axis_tready = s_axis_tready_reg;
