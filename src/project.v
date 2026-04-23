@@ -191,8 +191,8 @@ endmodule
 
 
 module clock_divider(output clk_out, input clk_in, reset);
-    reg [15:0] internal;
-    assign clk_out = (internal == 16'hFFFF);
+    reg [13:0] internal;   // 14-bit: ~6kHz scan at 100MHz (was 16-bit)
+    assign clk_out = (internal == 14'h3FFF);
     always @(posedge clk_in or posedge reset)
         if (reset) internal <= 0;
         else       internal <= internal + 1;
