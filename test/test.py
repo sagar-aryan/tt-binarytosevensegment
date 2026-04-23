@@ -8,7 +8,7 @@ from cocotb.triggers import ClockCycles, RisingEdge, Timer
 
 # Design uses prescale=109, so baud period = 109 * 2 * clk_period
 # clk_period = 10 ns  →  baud_period = 2180 ns
-BAUD_PERIOD_NS = 2180
+BAUD_PERIOD_NS = 8720
 
 
 async def uart_send_byte(dut, data: int):
@@ -78,19 +78,19 @@ async def test_project(dut):
     dut._log.info("PASS: uio_oe == 0xFF")
 
     # Test 1: decimal 1  (0x00_00_00_01)
-    await send_packet(dut, 0x00, 0x00, 0x00, 0x01)
+   await send_packet(dut, 0x01, 0x00, 0x00, 0x00)
     dut._log.info(f"After packet 1 – uo_out=0x{int(dut.uo_out.value):02X}  uio_out=0x{int(dut.uio_out.value):02X}")
 
     # Test 2: decimal 123456  (0x00_01_E2_40)
-    await send_packet(dut, 0x00, 0x01, 0xE2, 0x40)
+    await send_packet(dut, 0x40, 0xE2, 0x01, 0x00)
     dut._log.info(f"After packet 2 – uo_out=0x{int(dut.uo_out.value):02X}  uio_out=0x{int(dut.uio_out.value):02X}")
 
     # Test 3: decimal 123456789  (0x07_5B_CD_15)
-    await send_packet(dut, 0x07, 0x5B, 0xCD, 0x15)
+    await send_packet(dut, 0x15, 0xCD, 0x5B, 0x07)
     dut._log.info(f"After packet 3 – uo_out=0x{int(dut.uo_out.value):02X}  uio_out=0x{int(dut.uio_out.value):02X}")
 
     # Test 4: all zeros
-    await send_packet(dut, 0x00, 0x00, 0x00, 0x00)
+   await send_packet(dut, 0x00, 0x00, 0x00, 0x00) 
     dut._log.info(f"After packet 4 – uo_out=0x{int(dut.uo_out.value):02X}  uio_out=0x{int(dut.uio_out.value):02X}")
 
     # uio_oe must still be 0xFF throughout
