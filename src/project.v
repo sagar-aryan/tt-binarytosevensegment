@@ -393,31 +393,5 @@ module uart_eight_driver(
     );
 endmodule
 
-module dipslay_fpga(
-    output [6:0] seg,
-    output [7:0] an,
-    output       tx,
-    input        rx,
-    input        clk,
-    input        btnC
-);
-    uart_eight_driver fpga_instnatiation(
-        .cathode(seg), .anode(an),
-        .tx(tx), .rx(rx),
-        .clk(clk), .reset(btnC)
-    );
-endmodule
 
-module echod_fpga(
-    output tx,
-    input  rx,
-    input  clk,
-    input  btnC
-);
-    uart_echo_top echo_instance(
-        .clk(clk), .rst(btnC),
-        .rxd(rx),  .txd(tx),
-        .prescale(16'd109)
-    );
-endmodule
 
