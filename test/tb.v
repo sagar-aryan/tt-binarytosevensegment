@@ -74,7 +74,7 @@ module tb ();
   //   prescale = 109  (hardwired in uart_eight_driver)
   //   baud period = prescale * 2 * clk_period = 109 * 2 * 10 ns = 2180 ns
   // ---------------------------------------------------------------------------
-  localparam integer BAUD_PERIOD_NS = 2180;
+  localparam integer BAUD_PERIOD_NS = 8720;
 
   // ---------------------------------------------------------------------------
   // Task: send one UART byte (8N1, LSB first) on ui_in[0]
@@ -166,23 +166,23 @@ module tb ();
     check_uio_oe;
 
     // ------ Test 1: Send 0x00_0x00_0x00_0x01  (decimal 1) ------
-    send_packet_and_check_ack(8'h00, 8'h00, 8'h00, 8'h01);
+   send_packet_and_check_ack(8'h01, 8'h00, 8'h00, 8'h00);  // 1
     $display("[%0t ns] Anode = 0x%02X  Cathode = 0x%02X", $time, anode, cathode);
 
     // ------ Test 2: Send 0x00_0x01_0xE2_0x40  (decimal 123456) ------
-    send_packet_and_check_ack(8'h00, 8'h01, 8'hE2, 8'h40);
+    send_packet_and_check_ack(8'h40, 8'hE2, 8'h01, 8'h00); 
     $display("[%0t ns] Anode = 0x%02X  Cathode = 0x%02X", $time, anode, cathode);
 
     // ------ Test 3: Send 0x07_0x5B_0xCD_0x15  (decimal 123456789) ------
-    send_packet_and_check_ack(8'h07, 8'h5B, 8'hCD, 8'h15);
+    send_packet_and_check_ack(8'h15, 8'hCD, 8'h5B, 8'h07);
     $display("[%0t ns] Anode = 0x%02X  Cathode = 0x%02X", $time, anode, cathode);
 
     // ------ Test 4: Boundary – all zeros ------
-    send_packet_and_check_ack(8'h00, 8'h00, 8'h00, 8'h00);
+    send_packet_and_check_ack(8'h00, 8'h00, 8'h00, 8'h00); 
     $display("[%0t ns] Anode = 0x%02X  Cathode = 0x%02X", $time, anode, cathode);
 
     // ------ Test 5: Max 27-bit value (0x07FF_FFFF → 134,217,727) ------
-    send_packet_and_check_ack(8'h07, 8'hFF, 8'hFF, 8'hFF);
+    send_packet_and_check_ack(8'hFF, 8'hFF, 8'hFF, 8'h07);
     $display("[%0t ns] Anode = 0x%02X  Cathode = 0x%02X", $time, anode, cathode);
 
     // ------ Let display refresh for a while ------
@@ -198,7 +198,7 @@ module tb ();
     check_uio_oe;
 
     // ------ Test after reset: send a fresh packet ------
-    send_packet_and_check_ack(8'h00, 8'h00, 8'h00, 8'h2A); // decimal 42
+    send_packet_and_check_ack(8'h2A, 8'h00, 8'h00, 8'h00); // decimal 42
     $display("[%0t ns] Anode = 0x%02X  Cathode = 0x%02X", $time, anode, cathode);
 
     // ------ Done ------
