@@ -262,11 +262,11 @@ module binary_bcd_decoder (
     output reg   busy
 );
 
-    reg [5:0]  count;
-    reg [31:0] bin_shift;   // binary shift register
-    reg [39:0] bcd;         // 40-bit BCD accumulator (10 digits)
-
-    integer i;
+    // Max displayable value is 99,999,999 = 0x5F5E0FF (27 bits).
+    // We only need 8 BCD digits = 32 bits of BCD, and 27 shifts.
+    reg [4:0]  count;           // 0..26, needs 5 bits
+    reg [26:0] bin_shift;       // trimmed to 27 bits
+    reg [31:0] bcd;             // 8 BCD digits (32 bits)
 
     always @(posedge clk or posedge reset) begin
         if (reset) begin
@@ -279,16 +279,13 @@ module binary_bcd_decoder (
         end
         else if (start && !busy) begin
             bcd       <= 0;
-            bin_shift <= decimal;
+            bin_shift <= decimal[26:0];  // discard bits above 99,999,999
             count     <= 0;
             done      <= 0;
             busy      <= 1;
         end
-        else if (busy && count < 32) begin
-            // Add-3 (adjust) step on all 10 BCD digits
-            // Must use blocking assignments for the intermediate value
-            if (bcd[39:36] >= 5) bcd[39:36] = bcd[39:36] + 3;
-            if (bcd[35:32] >= 5) bcd[35:32] = bcd[35:32] + 3;
+        else if (busy && count < 27) begin
+            // Add-3 (adjust) step on 8 BCD digits
             if (bcd[31:28] >= 5) bcd[31:28] = bcd[31:28] + 3;
             if (bcd[27:24] >= 5) bcd[27:24] = bcd[27:24] + 3;
             if (bcd[23:20] >= 5) bcd[23:20] = bcd[23:20] + 3;
@@ -299,12 +296,12 @@ module binary_bcd_decoder (
             if (bcd[3:0]   >= 5) bcd[3:0]   = bcd[3:0]   + 3;
 
             // Shift left: MSB of bin_shift feeds into LSB of bcd
-            bcd       <= {bcd[38:0], bin_shift[31]};
+            bcd       <= {bcd[30:0], bin_shift[26]};
             bin_shift <= bin_shift << 1;
             count     <= count + 1;
         end
         else if (busy) begin
-            result <= bcd[31:0];   // bottom 8 digits → display
+            result <= bcd[31:0];
             done   <= 1;
             busy   <= 0;
         end
@@ -392,6 +389,3 @@ module uart_eight_driver(
         .reset(reset)
     );
 endmodule
-
-
-
